@@ -1,0 +1,290 @@
+---
+title: "Лабораторная №3"
+output: html_notebook
+---
+
+
+Данные: сгенерированный набор по кредитным картам Glass{mlbench}. 
+```{r first}
+library('mlbench')
+library('GGally')
+library('MASS')
+
+my.seed <- 123
+train.percent <- 0.75
+# Исходные данные: набор Glass
+data(Glass)
+head(Glass)
+dim(Glass)
+# графики разброса
+ggpairs(Glass)
+```
+Логистическая регрессия.
+```{r second}
+# Отбираем наблюдения в обучающую выборку
+set.seed(my.seed)
+inTrain <- sample(seq_along(Glass$Type),
+                  nrow(Glass) * train.percent)
+inTest <- -inTrain
+df <- Glass[inTrain, ] 
+df.1 <- Glass[inTest, ] 
+summary(df, digits = 2)
+
+# фактические значения на обучающей выборке
+Факт <- df$Type
+# Логистическая регрессия 
+#Была проведена процедура последовательного исключения незначимых факторов
+model.logit <- glm(Type ~ RI + Na + Mg + Al + Si + K + Ca + Ba + Fe, 
+                   data = df,
+                   family = 'binomial')
+
+summary(model.logit)
+model.logit2 <- glm(Type ~ RI + Na + Mg + Al + Si + K + Ca + Ba, 
+                   data = df,
+                   family = 'binomial')
+
+summary(model.logit2)
+model.logit3 <- glm(Type ~ Na + Mg + Al + Si + K + Ca + Ba, 
+                    data = df,
+                    family = 'binomial')
+
+summary(model.logit3)
+model.logit4 <- glm(Type ~ Na + Mg + Si + K + Ca + Ba, 
+                    data = df,
+                    family = 'binomial')
+
+summary(model.logit4)
+model.logit5 <- glm(Type ~ Na + Mg + Si + Ca + Ba, 
+                    data = df,
+                    family = 'binomial')
+
+summary(model.logit5)
+model.logit6 <- glm(Type ~ Mg + Si + Ca + Ba, 
+                    data = df,
+                    family = 'binomial')
+
+summary(model.logit6)
+model.logit7 <- glm(Type ~ Mg + Si + Ca, 
+                    data = df,
+                    family = 'binomial')
+
+summary(model.logit7)
+# прогноз: вероятности принадлежности классу '1' 
+p.logit <- predict(model.logit7, df, type = 'response')
+
+Прогноз <- factor(ifelse(p.logit > 0.5, 2, 1), levels = c(1,2),
+                  labels = c('2', '1')) 
+
+
+
+# матрица неточностей
+conf.m <- table(Факт, Прогноз)
+conf.m
+
+# чувствительность
+conf.m[2, 2] / sum(conf.m[2, ])
+# специфичность
+conf.m[1, 1] / sum(conf.m[1, ])
+# верность
+sum(diag(conf.m)) / sum(conf.m)
+
+# фактические значения на тестовой выборке
+Факт.1 <- df.1$Type
+model.logit7 <- glm(Type ~ Mg + Si + Ca, 
+                    data = df.1,
+                    family = 'binomial')
+
+summary(model.logit7)
+# прогноз: вероятности принадлежности классу '1' 
+p.logit <- predict(model.logit7, df.1, type = 'response')
+
+Прогноз1 <- factor(ifelse(p.logit > 0.5, 2, 1), levels = c(1,2),
+                  labels = c('2', '1')) 
+
+
+
+# матрица неточностей
+conf.m <- table(Факт.1, Прогноз1)
+conf.m
+
+# чувствительность
+conf.m[2, 2] / sum(conf.m[2, ])
+# специфичность
+conf.m[1, 1] / sum(conf.m[1, ])
+# верность
+sum(diag(conf.m)) / sum(conf.m)
+
+```
+Отчёт по модели LDA содержит три раздела: априарные вероятности классов (Prior probabilities of groups), групповые средние объясняющих переменных (Group means) и коэффициенты линейной разделяющей границы (Coefficients of linear discriminants).Оценим модели LDA по обучающей и тестовой выборке. 
+```{r third}
+# LDA 
+#Обучающая 
+model.lda <- lda(Type ~ Mg + Si + Ca, data = df)
+
+model.lda
+
+# прогноз: вероятности принадлежности классу '1' 
+p.lda <- predict(model.lda, df, 
+                 type = 'response')
+Прогноз <- factor(ifelse(p.lda$posterior[, '1'] > 0.5, 
+                         2, 1),
+                  levels = c(1, 2),
+                  labels = c('2', '1'))
+
+# матрица неточностей
+conf.m <- table(Факт, Прогноз)
+conf.m
+
+# чувствительность
+conf.m[2, 2] / sum(conf.m[2, ])
+# специфичность
+conf.m[1, 1] / sum(conf.m[1, ])
+# верность
+sum(diag(conf.m)) / sum(conf.m)
+
+#тестовая 
+model.lda1 <- lda(Type ~ Mg + Si + Ca, data = df.1)
+
+model.lda1
+
+# прогноз: вероятности принадлежности классу '1' 
+p.lda1 <- predict(model.lda, df.1, 
+                 type = 'response')
+Прогноз1 <- factor(ifelse(p.lda1$posterior[, '1'] > 0.5, 
+                         2, 1),
+                  levels = c(1, 2),
+                  labels = c('2', '1'))
+
+# матрица неточностей
+conf.m <- table(Факт.1, Прогноз1)
+conf.m
+
+# чувствительность
+conf.m[2, 2] / sum(conf.m[2, ])
+# специфичность
+conf.m[1, 1] / sum(conf.m[1, ])
+# верность
+sum(diag(conf.m)) / sum(conf.m)
+
+```
+Верность на тестовой выборке выше, чем на обучающей.
+ROC-кривая для LDA на обучающей и на тестовой выборках.
+Построим график совместного изменения чувствительности и специфичности с изменением вероятности отсечения от 0 до 1 – ROC-кривую. 
+```{r fourth}
+# ROC-кривая для LDA на обучающей
+# считаем 1-SPC и TPR для всех вариантов границы отсечения
+x <- NULL    # для (1 - SPC)
+y <- NULL    # для TPR
+
+# заготовка под матрицу неточностей
+tbl <- as.data.frame(matrix(rep(0, 4), 2, 2))
+rownames(tbl) <- c('fact.2', 'fact.1')
+colnames(tbl) <- c('predict.2', 'predict.1')
+
+# цикл по вероятностям отсечения
+for (p in seq(0, 1, length = 501)) {
+  # прогноз
+  Прогноз <- factor(ifelse(p.lda$posterior[, '1'] > p, 
+                           2, 1),
+                    levels = c(1, 2),
+                    labels = c('2', '1'))
+  
+  # фрейм со сравнением факта и прогноза
+  df.compare <- data.frame(Факт = Факт, Прогноз = Прогноз)
+  
+  # заполняем матрицу неточностей
+  # TN
+  tbl[1, 1] <- nrow(df.compare[df.compare$Факт == '2' & df.compare$Прогноз == '2', ])
+  
+  # TP
+  tbl[2, 2] <- nrow(df.compare[df.compare$Факт == '1' & df.compare$Прогноз == '1', ])
+  
+  # FP
+  tbl[1, 2] <- nrow(df.compare[df.compare$Факт == '2' & df.compare$Прогноз == '1', ])
+  
+  # FN
+  tbl[2, 1] <- nrow(df.compare[df.compare$Факт == '1' & df.compare$Прогноз == '2', ])
+  
+  
+  # считаем характеристики
+  TPR <- tbl[2, 2] / sum(tbl[2, ])
+  y <- c(y, TPR)
+  SPC <- tbl[1, 1] / sum(tbl[1, ])
+  x <- c(x, 1 - SPC)
+}
+
+# строим ROC-кривую
+par(mar = c(5, 5, 1, 1))
+# кривая
+plot(x, y, 
+     type = 'l', col = 'blue', lwd = 3,
+     xlab = '(1 - SPC)', ylab = 'TPR', 
+     xlim = c(0, 1), ylim = c(0, 1))
+
+# прямая случайного классификатора
+abline(a = 0, b = 1, lty = 3, lwd = 2)
+p.vector <- seq(0, 1, length = 501)
+# точка для вероятности 0.5
+points(x[p.vector == 0.5], y[p.vector == 0.5], pch = 16)
+text(x[p.vector == 0.5], y[p.vector == 0.5], 'p = 0.5', pos = 4)
+# точка для вероятности 0.2
+points(x[p.vector == 0.2], y[p.vector == 0.2], pch = 16)
+text(x[p.vector == 0.2], y[p.vector == 0.2], 'p = 0.2', pos = 4)
+
+
+# ROC-кривая для LDA на тестовой
+x1 <- NULL    # для (1 - SPC)
+y1 <- NULL    # для TPR
+
+# заготовка под матрицу неточностей
+tbl1 <- as.data.frame(matrix(rep(0, 4), 2, 2))
+rownames(tbl1) <- c('fact.2', 'fact.1')
+colnames(tbl1) <- c('predict.2', 'predict.1')
+
+# вектор вероятностей для перебора
+p.vector <- seq(0, 1, length = 501)
+
+# цикл по вероятностям отсечения
+for (p in p.vector) {
+  # прогноз
+  Прогноз1 <- factor(ifelse(p.lda1$posterior[, '1'] > p, 
+                           2, 1),
+                    levels = c(1, 2),
+                    labels = c('2', '1'))
+  
+  # фрейм со сравнением факта и прогноза
+  df1.compare <- data.frame(Факт1 = Факт1, Прогноз1 = Прогноз1)
+  
+  # заполняем матрицу неточностей
+  tbl1[1, 1] <- nrow(df1.compare[df1.compare$Факт1 == '2' & df1.compare$Прогноз1 == '2', ])
+  tbl1[2, 2] <- nrow(df1.compare[df1.compare$Факт1 == '1' & df1.compare$Прогноз1 == '1', ])
+  tbl1[1, 2] <- nrow(df1.compare[df1.compare$Факт1 == '2' & df1.compare$Прогноз1 == '1', ])
+  tbl1[2, 1] <- nrow(df1.compare[df1.compare$Факт1 == '1' & df1.compare$Прогноз1 == '2', ])
+  
+  # считаем характеристики
+  TPR1 <- tbl1[2, 2] / sum(tbl1[2, 2] + tbl1[2, 1])
+  y1 <- c(y1, TPR1)
+  SPC1 <- tbl1[1, 1] / sum(tbl1[1, 1] + tbl1[1, 2])
+  x1 <- c(x1, 1 - SPC1)
+}
+
+# строим ROC-кривую
+par(mar = c(5, 5, 1, 1))
+# кривая
+plot(x1, y1, type = 'l', col = 'blue', lwd = 3,
+     xlab = '(1 - SPC)', ylab = 'TPR', 
+     xlim = c(0, 1), ylim = c(0, 1))
+# прямая случайного классификатора
+abline(a = 0, b = 1, lty = 3, lwd = 2)
+
+# точка для вероятности 0.5
+points(x1[p.vector == 0.5], y1[p.vector == 0.5], pch = 16)
+text(x1[p.vector == 0.5], y1[p.vector == 0.5], 'p = 0.5', pos = 4)
+# точка для вероятности 0.2
+points(x1[p.vector == 0.2], y1[p.vector == 0.2], pch = 16)
+text(x1[p.vector == 0.2], y1[p.vector == 0.2], 'p = 0.2', pos = 4)
+
+
+
+```
+ROC-кривая на обучающей выборке значительно лучше, чем на тестовой. 
